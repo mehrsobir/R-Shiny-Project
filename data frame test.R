@@ -14,18 +14,14 @@ df = data.frame(title=character(0), author=character(0), pub_date=character(0),
                 cat=character(0), typ=character(0))
 
 for (i in aa) {
-  doc = read_docx(paste('C:/Users/User/Downloads/1/1/', i, sep = ''))
+  doc = read_docx(paste('C:/Users/mehr1/Downloads/1/1/', i, sep = ''))
   doc = docx_summary(doc)$text
   doc = doc[doc != ""]
-  # if(nchar(trimws(doc[1])) > 100){
-  #   next
-  # }else{}
-  
   df = df %>% add_row(title=trimws(doc[1]), author=trimws(doc[length(doc)-1]), pub_date=trimws(doc[length(doc)]),
                       cat=NA, typ=NA)
-  file.copy(from = paste("C:/Users/User/Downloads/1/1/", i, sep = ''),
-            to   = "C:/Users/User/Downloads/1/")
-  file.remove(paste("C:/Users/User/Downloads/1/", i, sep = ''))
+  file.copy(from = paste("C:/Users/mehr1/Downloads/1/1/", i, sep = ''),
+            to   = "C:/Users/mehr1/Downloads/1/")
+  file.remove(paste("C:/Users/mehr1/Downloads/1/", i, sep = ''))
   
 }
 
