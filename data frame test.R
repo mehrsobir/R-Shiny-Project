@@ -2,7 +2,7 @@ library(officer)
 library(tidyverse)
 # library(filesstrings)
 
-aa = list.files('C:/Users/User/Downloads/1/1')
+aa = list.files('C:/Users/mehr1/Downloads/1/1')
 aa = aa[substr(aa, 1, 2) != '~$']
 bb = aa[substr(aa, nchar(aa)-3, nchar(aa)) == '.doc']
 aa = aa[substr(aa, nchar(aa)-4, nchar(aa)) == '.docx']
@@ -19,9 +19,15 @@ for (i in aa) {
   doc = doc[doc != ""]
   df = df %>% add_row(title=trimws(doc[1]), author=trimws(doc[length(doc)-1]), pub_date=trimws(doc[length(doc)]),
                       cat=NA, typ=NA)
-  file.copy(from = paste("C:/Users/mehr1/Downloads/1/1/", i, sep = ''),
-            to   = "C:/Users/mehr1/Downloads/1/")
-  file.remove(paste("C:/Users/mehr1/Downloads/1/", i, sep = ''))
+ 
+  file.move(
+    paste0("C:/Users/mehr1/Downloads/1/1/", i),
+    paste0("C:/Users/mehr1/Downloads/1/1/", str_replace_all(now(), ':', ''), '.docx')
+  )
+  
+  # file.copy(from = paste("C:/Users/mehr1/Downloads/1/1/", i, sep = ''),
+  #           to   = paste0("C:/Users/mehr1/Downloads/1/", now(), ".docx"))
+  # file.remove(paste("C:/Users/mehr1/Downloads/1/", i, sep = ''))
   
 }
 
