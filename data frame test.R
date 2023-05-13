@@ -10,9 +10,10 @@ aa = aa[substr(aa, nchar(aa)-4, nchar(aa)) == '.docx']
 # df = data.frame(matrix(nrow = 0, ncol = length(columns))) 
 
 # colnames(df) = columns
-df = data.frame(title=character(0), author=character(0), pub_date=character(0),
-                cat=character(0), typ=character(0))
-
+df = data.frame(topic='waedsdwaesd', stuff_id=1, pub_date='20/04/2022',
+                cats_id=1, types_id=1, link='asdce')
+df$pub_date[1] = as.character(as.Date(df$pub_date[1],"%d/%m/%Y"))
+df
 for (i in aa) {
   doc = read_docx(paste('C:/Users/mehr1/Downloads/1/1/', i, sep = ''))
   doc = docx_summary(doc)$text
@@ -31,5 +32,19 @@ for (i in aa) {
   
 }
 
+con <- dbConnect(odbc::odbc(), "PostgreSQL35W", timeout = 10)
+ dbWriteTable(con, "works22", df, append = TRUE)
+dbDisconnect(con)
+
 
 df
+aa ='28,04,2023'
+aa=as.Date(aa, tryFormats = c("%d.%m.%Y","%d/%m/%Y", "%d-%m-%Y", "%d,%m,%Y"))
+# aa=as.Date(aa, "%d%m%Y")
+aa
+format.Date(aa)
+
+file.move(
+  "C:/Users/mehr1/Downloads/1/1/",
+  "C:/Users/mehr1/Downloads/1/"
+)
