@@ -4,72 +4,94 @@ library(shinyjs)
 library(DBI)
 library(officer)
 library(tidyverse)
-library(RecordLinkage)
 library(rhandsontable)
 
-
-vorid <- function(id){
-  aa = list.files('C:/Users/mehr1/Downloads/1/1')
-  aa = aa[substr(aa, 1, 2) != '~$']
-  bb = aa[substr(aa, nchar(aa)-3, nchar(aa)) == '.doc']
-  aa = aa[substr(aa, nchar(aa)-4, nchar(aa)) == '.docx']
-  
-  df = data.frame(title=character(0), author=character(0), pub_date=character(0),
-                  cat=character(0), typ=character(0), link=character(0))
-  
-  for (i in aa) {
-    doc = read_docx(paste('C:/Users/mehr1/Downloads/1/1/', i, sep = ''))
-    doc = docx_summary(doc)$text
-    doc = doc[doc != ""]
-    link = paste0(str_replace_all(now(), ':', ''), '.docx')
-    file.move(
-      paste0("C:/Users/mehr1/Downloads/1/1/", i),
-      paste0("C:/Users/mehr1/Downloads/1/1/", link)
-    )
-    author = trimws(doc[length(doc)-1])
-    for(i in  c(1:length(staf$id))){
-      if((levenshteinSim(staf$name[i], trimws(doc[length(doc)-1])) > 0.8)
-         | (levenshteinSim(staf$sname[i], trimws(doc[length(doc)-1])) > 0.8 )){
-        author = staf$name[i]
-      }
-      
-    }
-    # df = rbind(df, data.frame(title=trimws(doc[1]), author=author, pub_date=trimws(doc[length(doc)]), cat=NA, typ=NA, link=link))
-    df = df %>% add_row(title=trimws(doc[1]), author=author, pub_date=trimws(doc[length(doc)]),
-                        cat="Дастгирии сиёсат", typ="Мақола", link=link)
-  }
-  return(df)
-}
-
-# Define UI for application that draws a histogram
-ui <- fluidPage(theme = shinytheme("cerulean"), useShinyjs(),  
+ui <- fluidPage(theme = shinytheme("cerulean"), 
+                useShinyjs(),  
   navbarPage("МОРМОИ",
-    # Application title
     tabPanel("Сабти корҳо",
+       wellPanel(
+         actionButton('voridBtn', 'Воридкунӣ', class = "btn-info"),
+         disabled(actionButton('omodBtn', 'Омодасозӣ', class = "btn-info")),
+         disabled(actionButton('saveBtn', 'Сабт', class = "btn-info")),
+         disabled(actionButton('movBtn', 'Ҳифзи файлҳо', class = "btn-info"))
+       ),       
       mainPanel(
-        uiOutput(
-          outputId = 'main',
+          rHandsontableOutput("voridtable")
         ),
         width = 12
         )
       ),
    )
-)
 
-# Define  logic required to draw a histogram
+
 server <- function(input, output) {
-  output$main <- renderUI(actionButton('voridBtn', 'Воридкунӣ', class = "btn-info"))
+    con <- dbConnect(odbc::odbc(), "PostgreSQL35W", timeout = 10)
+      cat = dbReadTable(con, 'cats')
+      typ = dbReadTable(con, 'types')
+      staf = dbReadTable(con, 'stuff') %>% select(id, name, sname)
+    dbDisconnect(con)
+  
     observeEvent(input$voridBtn,{
-      con <- dbConnect(odbc::odbc(), "PostgreSQL35W", timeout = 10)
-        cat = dbReadTable(con, 'cats')
-        typ = dbReadTable(con, 'types')
-        staf = dbReadTable(con, 'stuff') %>% select(id, name, sname)
-      dbDisconnect(con)
+      df = vorid(staf)
+      output$voridtable <- renderRHandsontable({
+        vorid_tbl(df, staf, cat, typ)
+      })
+      if(length(df$topic)){
+        disable("voridBtn")
+        enable("omodBtn")
+      }
+    })
+    
+    observeEvent(input$voridtable, {
+      df = hot_to_r(input$voridtable)
+      output$voridtable <- renderRHandsontable({
+        vorid_tbl(df, staf, cat, typ)
+      })
+    })
+    
+    observeEvent(input$omodBtn, {
+      df = hot_to_r(input$voridtable)
+      dif = setdiff(df$author, staf$name)
+      difdt = df$pub_date[is.na(parse_date_time(df$pub_date,orders="dmy"))]
+      if(length(dif) == 0 && length(difdt) == 0){
+        df = clean_data(df, staf, typ, cat)
+        output$voridtable <- renderRHandsontable({
+          vorid_tbl(df, staf, cat, typ)
+        })
+        disable("omodBtn")
+        enable("saveBtn")
+      } else{
+        output$voridtable <- renderRHandsontable({
+          vorid_tbl(df, staf, cat, typ)
+        })
+      }
       
-      df = vorid('d')
-      nn = reactiveValues(data = df)
-      voridServer('sss', nn$data, staf, cat, typ)
-      output$main <- renderUI(voridUI('sss'))
+    })
+    
+    observeEvent(input$saveBtn, {
+      df = hot_to_r(input$voridtable)
+      con <- dbConnect(odbc::odbc(), "PostgreSQL35W", timeout = 10)
+        dbWriteTable(con, "works", df, append = TRUE)
+      dbDisconnect(con)
+      disable("saveBtn")
+      enable("movBtn")
+    })
+    
+    observeEvent(input$movBtn, {
+      df = hot_to_r(input$voridtable)
+      for (i in df$link) {
+        file.move(
+          paste0("C:/Users/mehr1/Downloads/1/1/", i),
+          paste0("E:/top/mavod/", i)
+        )
+      }
+      showModal(modalDialog(
+        title = 'Success',
+        h1("Done"),
+        footer = modalButton('Dismiss')
+      ))
+      disable("movBtn")
     })
     
 }

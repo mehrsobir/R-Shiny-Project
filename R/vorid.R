@@ -1,130 +1,96 @@
-voridUI <- function(id) {
-  ns <- NS(id)
-  tagList(
-    wellPanel(
-      actionButton(ns('virBtn'), 'Вироиш', class = "btn-info"),
-      disabled(actionButton(ns('omodBtn'), 'Омодасозӣ', class = "btn-info")),
-      disabled(actionButton(ns('saveBtn'), 'Сабт', class = "btn-info")),
-      disabled(actionButton(ns('movBtn'), 'Ҳифзи файлҳо', class = "btn-info"))
-    ),
-    rHandsontableOutput(ns("hottable"))
-    
-  )
-}
-
-voridServer <- function(id, df, autch, catch, typch) {
-  dif = setdiff(df$author, autch$name)
-  dif = row.names(df)[df$author %in% dif] %>% as.integer(dif)-1
-  df2 = reactiveValues(dd = NULL)
-  moduleServer(
-    id,
-    function(input, output, session) {
-      output$hottable <- renderRHandsontable({
-        rhandsontable(df, row_highlight = dif, colHeaders = c("Ном","Муаллиф","Сана", "Бахш", "Мавод", "Файл"), 
-                      width = 2000, overflow = "visible") %>%
-          hot_table(highlightCol = TRUE, highlightRow = TRUE, width = 12) %>% 
-          hot_cols(colWidths = c(500, 200, 100, 200, 200, 250), renderer = "
-           function (instance, td, row, col, prop, value, cellProperties) {
-             Handsontable.renderers.TextRenderer.apply(this, arguments);
-             if (instance.params) {
-                       hrows = instance.params.row_highlight
-                       hrows = hrows instanceof Array ? hrows : [hrows]
-                       hcols = 1
-                       hcols = hcols instanceof Array ? hcols : [hcols]
-
-                       if (hcols.includes(col) && hrows.includes(row)) {
-                          td.style.background = 'lightgrey';
-                        }
-                     }
-           }") %>%
-          hot_col(col = "Муаллиф", type = "dropdown", source = autch$name, strict = FALSE, allowInvalid = TRUE) %>%
-          hot_col(col = "Бахш", type = "dropdown", source = catch$cat, strict = FALSE, allowInvalid = TRUE) %>%
-          hot_col(col = "Мавод", type = "dropdown", source = typch$type, strict = FALSE, allowInvalid = TRUE)
-      })
-      observe({
-        df2$dd = hot_to_r(input$hottable)
-      })
-      observeEvent(input$virBtn,{
-        dif = setdiff(df2$dd$author, autch$name)
-        dif = row.names(df2$dd)[df2$dd$author %in% dif] %>% as.integer(dif)-1
-        if(length(dif)>0){
-          showModal(modalDialog(
-            title = 'ДАР СУТУНИ МУАЛЛИФ ХАТО ВУҶУД ДОРАД!!',
-            h1('Хаторо истоҳ кунед!!'),
-            footer = modalButton('Dismiss')
-            ))
-        }else{
-        output$hottable <- renderRHandsontable({
-          rhandsontable(df2$dd, row_highlight = dif, colHeaders = c("Ном","Муаллиф","Сана", "Бахш", "Мавод", "Файл"), 
-                        width = 2000, overflow = "visible", readOnly = TRUE) %>%
-            hot_table(highlightCol = TRUE, highlightRow = TRUE, width = 12) %>% 
-            hot_cols(colWidths = c(500, 200, 100, 200, 200, 250))
-        })
-        disable("virBtn")
-        enable("omodBtn")
-        }
-        
-      })
+vorid <- function(staf){
+  aa = list.files('C:/Users/mehr1/Downloads/1/1')
+  aa = aa[substr(aa, 1, 2) != '~$']
+  bb = aa[substr(aa, nchar(aa)-3, nchar(aa)) == '.doc']
+  aa = aa[substr(aa, nchar(aa)-4, nchar(aa)) == '.docx']
+  
+  df = data.frame(topic=character(0), stuff_id=character(0), pub_date=character(0),
+                  cats_id=character(0), types_id=character(0), link=character(0))
+  
+  for (i in aa) {
+    doc = read_docx(paste('C:/Users/mehr1/Downloads/1/1/', i, sep = ''))
+    doc = docx_summary(doc)$text
+    doc = doc[doc != ""]
+    link = paste0(str_replace_all(now(), ':', ''), '.docx')
+    file.move(
+      paste0("C:/Users/mehr1/Downloads/1/1/", i),
+      paste0("C:/Users/mehr1/Downloads/1/1/", link)
+    )
+    stuff_id = trimws(doc[length(doc)-1])
+    for(i in  c(1:length(staf$id))){
+      if((levenshteinSim(staf$name[i], trimws(doc[length(doc)-1])) > 0.8)
+         | (levenshteinSim(staf$sname[i], trimws(doc[length(doc)-1])) > 0.8 )){
+        stuff_id = staf$name[i]
+      }
       
-      observeEvent(input$omodBtn, {
-        for (i in c(1:length(df2$dd$author))) {
-          
-          for (j in c(1:length(autch$name))) {
-            if(df2$dd$author[i] == autch$name[j]){
-              df2$dd$author[i] = autch$id[j]
-            }
-          }
-          for (j in c(1:length(typch$type))) {
-            if(df2$dd$typ[i] == typch$type[j]){
-              df2$dd$typ[i] = typch$id[j]
-            }
-          }
-          for (j in c(1:length(catch$cat))) {
-            if(df2$dd$cat[i] == catch$cat[j]){
-              df2$dd$cat[i] = catch$id[j]
-            }
-          }
-          
-          df2$dd$pub_date[i] = as.character(as.Date(df2$dd$pub_date[i], tryFormats = c("%d.%m.%Y","%d/%m/%Y", "%d-%m-%Y", "%d,%m,%Y")))
-        }
-         
-        print(df2$dd)
-        disable("omodBtn")
-        enable("saveBtn")
-      })
-      
-      observeEvent(input$saveBtn, {
-        con <- dbConnect(odbc::odbc(), "PostgreSQL35W", timeout = 10)
-          dbWriteTable(con, "works22", df2$dd, append = TRUE)
-        dbDisconnect(con)
-        x = df2$dd[1,]
-        print(x)
-        showModal(modalDialog(
-          title = 'tesr', 
-          textInput('t', 'title', x$title),
-          textInput('a', 'author', x$author),
-          
-          footer = modalButton('Dismiss')))
-        disable("saveBtn")
-        enable("movBtn")
-      })
-      observeEvent(input$saveBtn, {
-        for (i in df2$dd$link) {
-          file.move(
-            paste0("C:/Users/mehr1/Downloads/1/1/", i),
-            "C:/Users/mehr1/Downloads/1/"
-          )
-        }
-        x = df2$dd[1,]
-        print(x)
-        showModal(modalDialog(
-          title = 'tesr', 
-          textInput('t', 'title', x$title),
-          textInput('a', 'author', x$author),
-          
-          footer = modalButton('Dismiss')))
-        disable("movBtn")
-      })
     }
-  )
+    
+    df = df %>% add_row(topic=trimws(doc[1]), stuff_id=stuff_id, pub_date=trimws(doc[length(doc)]),
+                        cats_id="Дастгирии сиёсат", types_id="Мақола", link=link)
+  }
+  return(df)
 }
+
+vorid_tbl <- function(df, staf, cats, types) {
+  dif = setdiff(df$stuff_id, staf$name)
+  dif = row.names(df)[df$stuff_id %in% dif] %>% as.integer(dif)-1
+  date_dif = row.names(df)[is.na(parse_date_time(df$pub_date, orders="dmy"))] %>% as.integer(dif)-1
+  tbl = rhandsontable(df, row_highlight = dif, row_date_highlight = date_dif, colHeaders = c("Ном","Муаллиф","Сана", "Бахш", "Мавод", "Файл"), 
+                width = 2000, overflow = "visible") %>%
+    hot_table(highlightCol = TRUE, highlightRow = TRUE, width = 12) %>% 
+    hot_cols(colWidths = c(500, 200, 100, 200, 200, 250), renderer = "
+     function (instance, td, row, col, prop, value, cellProperties) {
+       Handsontable.renderers.TextRenderer.apply(this, arguments);
+       if (instance.params) {
+                 hrows = instance.params.row_highlight
+                 hrows = hrows instanceof Array ? hrows : [hrows]
+                 hcols = 1
+                 hcols = hcols instanceof Array ? hcols : [hcols]
+                 
+                 hrowsdate = instance.params.row_date_highlight
+                 hrowsdate = hrowsdate instanceof Array ? hrowsdate : [hrowsdate]
+                 hcolsdate = 2
+                 hcolsdate = hcolsdate instanceof Array ? hcolsdate : [hcolsdate]
+
+                 if (hcols.includes(col) && hrows.includes(row)) {
+                    td.style.background = 'lightgrey';
+                 }
+                  if (hcolsdate.includes(col) && hrowsdate.includes(row)) {
+                    td.style.background = 'lightgrey';
+                  }
+               }
+     }") %>%
+    hot_col(col = "Муаллиф", type = "dropdown", source = staf$name, strict = FALSE, allowInvalid = TRUE) %>%
+    hot_col(col = "Бахш", type = "dropdown", source = cats$cat, strict = FALSE, allowInvalid = TRUE) %>%
+    hot_col(col = "Мавод", type = "dropdown", source = types$type, strict = FALSE, allowInvalid = TRUE)
+  
+    return(tbl)
+  }
+
+clean_data <- function(df, staf, types, cats){
+  for (i in c(1:length(df$stuff_id))) {
+    
+    for (j in c(1:length(staf$name))) {
+      if(df$stuff_id[i] == staf$name[j]){
+        df$stuff_id[i] = staf$id[j]
+      }
+    }
+    for (j in c(1:length(types$type))) {
+      if(df$types_id[i] == types$type[j]){
+        df$types_id[i] = types$id[j]
+      }
+    }
+    for (j in c(1:length(cats$cat))) {
+      if(df$cats_id[i] == cats$cat[j]){
+        df$cats_id[i] = cats$id[j]
+      }
+    }
+    
+    df$pub_date[i] = as.character(as.Date(df$pub_date[i], tryFormats = c("%d.%m.%Y","%d/%m/%Y", "%d-%m-%Y", "%d,%m,%Y")))
+  }
+  return(df)
+}
+
+
+
+      
